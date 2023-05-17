@@ -10,6 +10,8 @@ git clone git@github.com:jacobDeutsch10/marl_with_gnns.git
 cd marl_with_gnns
 
 pip install -e .
+
+wandb login # copy api key
 ```
 
 ## run

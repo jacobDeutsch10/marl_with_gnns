@@ -22,5 +22,6 @@ setup(
         "tensorboard",
         "tensorflow_probability",
         "torch_geometric",
+        "wandb",
     ],
 )
