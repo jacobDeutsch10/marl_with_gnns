@@ -23,5 +23,7 @@ setup(
         "tensorflow_probability",
         "torch_geometric",
         "wandb",
+        "pygame",
+        "pymunk",
     ],
 )
