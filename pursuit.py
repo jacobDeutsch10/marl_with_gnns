@@ -49,12 +49,6 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 ray.init(num_gpus=1, ignore_reinit_error=True)
 register_env("pursuit", lambda _: PettingZooEnv(pursuit_v4.env()))
 
-env = PettingZooEnv(pursuit_v4.env())
-obs_space = env.observation_space
-act_space = env.action_space
-print(obs_space)
-print(act_space)
-print(env.reset())
 ModelCatalog.register_custom_model(
         "pursuitmlp", PursuitMLP 
     )

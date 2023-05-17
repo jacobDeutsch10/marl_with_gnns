@@ -12,8 +12,8 @@ setup(
         "torchvision",
         "numpy",
         "matplotlib",
-        "ray[rllib]",
-        "pettingzoo",
+        "ray[rllib]==2.4.0",
+        "pettingzoo==1.22.3",
         "gym",
         "networkx",
         "scipy",
@@ -25,5 +25,6 @@ setup(
         "wandb",
         "pygame",
         "pymunk",
+
     ],
 )
