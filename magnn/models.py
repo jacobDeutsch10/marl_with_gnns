@@ -6,11 +6,40 @@ import time
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, Sequential
+from torch_geometric.nn import GATConv, GCNConv, Sequential
 from torch_geometric.nn import global_mean_pool
 from magnn.transforms import obs_to_graph_batch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class PursuitGAT(TorchModelV2, nn.Module):
+    def __init__(self, obs_space, act_space, num_outputs, *args, **kwargs):
+        TorchModelV2.__init__(self, obs_space, act_space, num_outputs, *args, **kwargs)
+        nn.Module.__init__(self)
+        self.model = Sequential('x, edge_index, batch', [
+            (GATConv(3, 64), 'x, edge_index -> x'),
+            nn.ReLU(inplace=True),
+            (GATConv(64, 64), 'x, edge_index -> x'),
+            nn.ReLU(inplace=True),
+            (GATConv(64, 64), 'x, edge_index -> x'),
+            nn.ReLU(inplace=True),
+            (global_mean_pool, ('x, batch -> x'))
+        ])
+        self.value_fn = nn.Linear(64, 1) 
+        self.policy_fn = nn.Linear(64, num_outputs)
+
+    def value_function(self):
+        value_out = self.value_fn(self._model_out)
+        return torch.reshape(value_out, [-1])
+
+    @override(ModelV2)
+    def forward(self, input_dict, state, seq_lens):
+        model_in = obs_to_graph_batch(input_dict["obs"]).to(device)
+        self._model_out = self.model(model_in.x, model_in.edge_index, model_in.batch)
+        policy_out = self.policy_fn(self._model_out)
+        return policy_out, []
+
+
 class PursuitGNN(TorchModelV2, nn.Module):
     def __init__(self, obs_space, act_space, num_outputs, *args, **kwargs):
         TorchModelV2.__init__(self, obs_space, act_space, num_outputs, *args, **kwargs)
