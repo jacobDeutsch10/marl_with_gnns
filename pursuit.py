@@ -28,7 +28,6 @@ parser.add_argument("--lambd", type=float, default=0.95)
 parser.add_argument("--num_workers", type=int, default=12)
 parser.add_argument("--num_envs_per_worker", type=int, default=4)
 parser.add_argument("--num_gpus", type=int, default=1)
-parser.add_argument("--num_steps_sampled_before_learning_starts", type=int, default=1000)
 parser.add_argument("--compress_observations", type=bool, default=False)
 parser.add_argument("--rollout_fragment_length", type=str, default='auto')
 parser.add_argument("--train_batch_size", type=int, default=512)
@@ -79,7 +78,6 @@ tune.Tuner(
         "num_gpus": args.num_gpus,
         "num_workers": args.num_workers,
         "num_envs_per_worker": args.num_envs_per_worker,
-        "num_steps_sampled_before_learning_starts": args.num_steps_sampled_before_learning_starts,
         "compress_observations": args.compress_observations,
         "rollout_fragment_length": args.rollout_fragment_length,
         "train_batch_size": args.train_batch_size,

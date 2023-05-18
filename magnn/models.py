@@ -2,6 +2,7 @@
 from ray.rllib.utils.annotations import override
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.models.modelv2 import ModelV2
+import time
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
