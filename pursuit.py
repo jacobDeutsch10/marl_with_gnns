@@ -13,11 +13,14 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", '--model', type=str, default="mlp", choices=["mlp", "cnn", "gnn"])
 
+"""python pursuit.py -m mlp --train_batch_size 5000 --lr 0.0001 --batch_mode truncate_episodes"""
+
+
 ### PPO parameters
 parser.add_argument("--gamma", type=float, default=0.99)
 parser.add_argument("--n_step", type=int, default=3)
 parser.add_argument("--lr", type=float, default=1e-4)
-parser.add_argument("--num_sgd_iter", type=int, default=30)
+parser.add_argument("--num_sgd_iter", type=int, default=5)
 parser.add_argument("--sample_batch_size", type=int, default=25)
 parser.add_argument("--sgd_minibatch_size", type=int, default=128)
 parser.add_argument("--clip_param", type=float, default=0.1)
@@ -25,7 +28,7 @@ parser.add_argument("--vf_clip_param", type=float, default=10.0)
 parser.add_argument("--entropy_coeff", type=float, default=0.01)
 parser.add_argument("--kl_target", type=float, default=0.01)
 parser.add_argument("--lambd", type=float, default=0.95)
-parser.add_argument("--num_workers", type=int, default=12)
+parser.add_argument("--num_workers", type=int, default=3)
 parser.add_argument("--num_envs_per_worker", type=int, default=4)
 parser.add_argument("--num_gpus", type=int, default=1)
 parser.add_argument("--compress_observations", type=bool, default=False)
@@ -61,7 +64,7 @@ ModelCatalog.register_custom_model(
 tune.Tuner(
     "PPO",
     run_config=air.RunConfig(
-        stop={"episodes_total": 60000},
+        stop={"episodes_total": 600},
          local_dir="ray_results/pursuit",
         name=f"PPO_{args.model}_pursuit",
         checkpoint_config=air.CheckpointConfig(

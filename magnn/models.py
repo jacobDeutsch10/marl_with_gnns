@@ -110,24 +110,18 @@ class PursuitMLP(TorchModelV2, nn.Module):
             nn.ReLU(),
             nn.Linear(128, 128),
             nn.ReLU(),
-            nn.Linear(128, num_outputs),
+            
         )
-        self.v_model = nn.Sequential(
-            nn.Linear(x*y*c, 128),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1),
-        )
-        self._model_in = None
+        self.policy_fn = nn.Linear(128, num_outputs),
+        self.value_fn = nn.Linear(128, 1)
+        self._model_out = None
     def value_function(self):
-        value_out = self.v_model(self._model_in)
+        value_out = self.v_model(self._model_out)
         return torch.reshape(value_out, [-1])
 
     @override(ModelV2)
     def forward(self, input_dict, state, seq_lens):
-        self._model_in = input_dict["obs"].float().flatten(1)
-        model_out = self.model(self._model_in)
-        return model_out, []
+        model_in = input_dict["obs"].float().flatten(1)
+        self._model_out = self.model(model_in)
+        policy_out = self.policy_fn(self._model_out)
+        return policy_out, []
