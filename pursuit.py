@@ -8,6 +8,7 @@ import torch.nn as nn
 from ray.rllib.models import ModelCatalog
 from ray.air.integrations.wandb import WandbLoggerCallback
 from magnn.models import PursuitMLP, PursuitCNN, PursuitGNN
+from magnn.env import env as pursuit_env
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -28,7 +29,6 @@ parser.add_argument("--lambd", type=float, default=0.95)
 parser.add_argument("--num_workers", type=int, default=12)
 parser.add_argument("--num_envs_per_worker", type=int, default=4)
 parser.add_argument("--num_gpus", type=int, default=1)
-parser.add_argument("--num_steps_sampled_before_learning_starts", type=int, default=1000)
 parser.add_argument("--compress_observations", type=bool, default=False)
 parser.add_argument("--rollout_fragment_length", type=str, default='auto')
 parser.add_argument("--train_batch_size", type=int, default=512)
@@ -38,7 +38,10 @@ parser.add_argument("--framework", type=str, default="torch")
 args = parser.parse_args()
 
 
-
+def create_env():
+    base_env = pursuit_env(args.model=="gnn")
+    env = PettingZooEnv(base_env)
+    return env
 model_map = {
     "mlp": "pursuitmlp",
     "cnn": "pursuitcnn",
@@ -47,7 +50,7 @@ model_map = {
 
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 ray.init(num_gpus=1, ignore_reinit_error=True)
-register_env("pursuit", lambda _: PettingZooEnv(pursuit_v4.env()))
+register_env("pursuit", lambda _: create_env())
 
 ModelCatalog.register_custom_model(
         "pursuitmlp", PursuitMLP 
@@ -73,13 +76,13 @@ tune.Tuner(
     param_space={
         # Enviroment specific.
         "env": "pursuit",
+        "_disable_preprocessor_api": False,
         # General
         "framework": "torch",
         "batch_mode": "complete_episodes",
         "num_gpus": args.num_gpus,
         "num_workers": args.num_workers,
         "num_envs_per_worker": args.num_envs_per_worker,
-        "num_steps_sampled_before_learning_starts": args.num_steps_sampled_before_learning_starts,
         "compress_observations": args.compress_observations,
         "rollout_fragment_length": args.rollout_fragment_length,
         "train_batch_size": args.train_batch_size,
