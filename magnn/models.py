@@ -87,7 +87,7 @@ class PursuitMLP(TorchModelV2, nn.Module):
         self.value_fn = nn.Linear(128, 1)
         self._model_out = None
     def value_function(self):
-        value_out = self.v_model(self._model_out)
+        value_out = self.value_fn(self._model_out)
         return torch.reshape(value_out, [-1])
 
     @override(ModelV2)
