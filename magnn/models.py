@@ -83,7 +83,7 @@ class PursuitMLP(TorchModelV2, nn.Module):
             nn.ReLU(),
             
         )
-        self.policy_fn = nn.Linear(128, num_outputs),
+        self.policy_fn = nn.Linear(128, num_outputs)
         self.value_fn = nn.Linear(128, 1)
         self._model_out = None
     def value_function(self):
