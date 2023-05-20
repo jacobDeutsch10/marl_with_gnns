@@ -19,15 +19,15 @@ class PursuitGNN(TorchModelV2, nn.Module):
         self.model = Sequential('x, edge_index, batch', [
             (GCNConv(3, 64), 'x, edge_index -> x'),
             nn.ReLU(inplace=True),
-            (GCNConv(64, 64), 'x, edge_index -> x'),
+            (GCNConv(64, 128), 'x, edge_index -> x'),
             nn.ReLU(inplace=True),
-            (GCNConv(64, 64), 'x, edge_index -> x'),
+            (GCNConv(128, 128), 'x, edge_index -> x'),
             nn.ReLU(inplace=True),
             (global_mean_pool, ('x, batch -> x'))
         ])
 
-        self.value_fn = nn.Linear(64, 1) 
-        self.policy_fn = nn.Linear(64, num_outputs)
+        self.value_fn = nn.Linear(128, 1) 
+        self.policy_fn = nn.Linear(128, num_outputs)
     def value_function(self):
         value_out = self.value_fn(self._model_out)
         return torch.reshape(value_out, [-1])
