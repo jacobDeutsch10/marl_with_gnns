@@ -57,13 +57,12 @@ class PursuitConvEncGNN(TorchModelV2, nn.Module):
             nn.Conv2d(16, 32, [3, 3], stride=1, padding=1),
             nn.ReLU(),
         )
-        self.threshold = LearnedThreshold()
-        self.model = Sequential('x, edge_index, edge_attr, batch', [
-            (GENConv(32, 64, edge_dim=32), 'x, edge_index, edge_attr -> x'),
+        self.model = Sequential('x, edge_index, edge_weight, batch', [
+            (GCNConv(32, 64), 'x, edge_index, edge_weight -> x'),
             nn.ReLU(inplace=True),
-            (GENConv(64, 128, edge_dim=32), 'x, edge_index, edge_attr -> x'),
+            (GCNConv(64, 128), 'x, edge_index, edge_weight -> x'),
             nn.ReLU(inplace=True),
-            (GENConv(128, 128, edge_dim=32), 'x, edge_index, edge_attr -> x'),
+            (GCNConv(128, 128), 'x, edge_index, edge_weight -> x'),
             nn.ReLU(inplace=True),
             (global_mean_pool, ('x, batch -> x'))
         ])
@@ -76,8 +75,8 @@ class PursuitConvEncGNN(TorchModelV2, nn.Module):
     def encode_obs(self, obs):
         obs_enc = self.encoder(obs.permute(0, 3, 1, 2))
         x = torch.diagonal(obs_enc, dim1=2, dim2=3).permute(0, 2, 1)
-        adj = self.threshold(obs_enc.mean(dim=1))
-        non_zero = torch.nonzero(adj)
+        edge_weight = obs_enc.mean(dim=1)
+        non_zero = torch.nonzero(edge_weight)
         if non_zero.shape[0] == 0:
             return None, None, None, None
 
