@@ -7,7 +7,7 @@ import os
 import torch.nn as nn
 from ray.rllib.models import ModelCatalog
 from ray.air.integrations.wandb import WandbLoggerCallback
-from magnn.models import PursuitMLP, PursuitCNN, PursuitGNN
+from magnn.models import PursuitMLP, PursuitCNN, PursuitGNN, PursuitConvEncGNN
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -36,6 +36,7 @@ parser.add_argument("--rollout_fragment_length", type=str, default='auto')
 parser.add_argument("--train_batch_size", type=int, default=512)
 parser.add_argument("--batch_mode", type=str, default="complete_episodes")
 parser.add_argument("--framework", type=str, default="torch")
+parser.add_argument("--use_wandb", type=bool, default=True)
 
 args = parser.parse_args()
 
@@ -58,9 +59,11 @@ ModelCatalog.register_custom_model(
         "pursuitcnn", PursuitCNN
 )
 ModelCatalog.register_custom_model(
-        "pursuitgnn", PursuitGNN
+        "pursuitgnn", PursuitConvEncGNN
 )
-
+cb = []
+if args.use_wandb:
+    cb = [WandbLoggerCallback(project="marl-w-gnn")]
 tune.Tuner(
     "PPO",
     run_config=air.RunConfig(
@@ -70,7 +73,7 @@ tune.Tuner(
         checkpoint_config=air.CheckpointConfig(
             checkpoint_frequency=50,
         ),
-        callbacks=[WandbLoggerCallback(project="marl-w-gnn")],
+        callbacks=cb,
     ),
     param_space={
         # Enviroment specific.

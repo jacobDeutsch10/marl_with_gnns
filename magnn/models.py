@@ -6,7 +6,7 @@ import time
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, Sequential
+from torch_geometric.nn import GCNConv, Sequential, GENConv
 from torch_geometric.nn import global_mean_pool
 from magnn.transforms import obs_to_graph_batch
 
@@ -39,11 +39,72 @@ class PursuitGNN(TorchModelV2, nn.Module):
         policy_out = self.policy_fn(self._model_out)
         return policy_out, []
 
+class LearnedThreshold(nn.Module):
+    def __init__(self):
+        super(LearnedThreshold, self).__init__()
+        self.threshold = nn.Parameter(torch.tensor(0.5))  # Initialize threshold as 0.5
+
+    def forward(self, x):
+        return (x > self.threshold).float() * 1.0
+
+class PursuitConvEncGNN(TorchModelV2, nn.Module):
+    def __init__(self, obs_space, act_space, num_outputs, *args, **kwargs):
+        TorchModelV2.__init__(self, obs_space, act_space, num_outputs, *args, **kwargs)
+        nn.Module.__init__(self)
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, 16, [3,3], stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, [3, 3], stride=1, padding=1),
+            nn.ReLU(),
+        )
+        self.threshold = LearnedThreshold()
+        self.model = Sequential('x, edge_index, edge_attr, batch', [
+            (GENConv(32, 64, edge_dim=32), 'x, edge_index, edge_attr -> x'),
+            nn.ReLU(inplace=True),
+            (GENConv(64, 128, edge_dim=32), 'x, edge_index, edge_attr -> x'),
+            nn.ReLU(inplace=True),
+            (GENConv(128, 128, edge_dim=32), 'x, edge_index, edge_attr -> x'),
+            nn.ReLU(inplace=True),
+            (global_mean_pool, ('x, batch -> x'))
+        ])
+
+        self.value_fn = nn.Linear(128, 1) 
+        self.policy_fn = nn.Linear(128, num_outputs)
+    def value_function(self):
+        value_out = self.value_fn(self._model_out)
+        return torch.reshape(value_out, [-1])
+    def encode_obs(self, obs):
+        obs_enc = self.encoder(obs.permute(0, 3, 1, 2))
+        x = torch.diagonal(obs_enc, dim1=2, dim2=3).permute(0, 2, 1)
+        adj = self.threshold(obs_enc.mean(dim=1))
+        non_zero = torch.nonzero(adj)
+        if non_zero.shape[0] == 0:
+            return None, None, None, None
+
+        batch = non_zero[:, 0]
+        edge_index = torch.cat((non_zero[:, 1].unsqueeze(0)+147*batch, non_zero[:, 2].unsqueeze(0)+147*batch), dim=0)
+        edge_attr = x[non_zero[:,0] :, non_zero[:,1], non_zero[:,2]]
+
+        return x, edge_index, edge_attr, batch
+
+
+
+    @override(ModelV2)
+    def forward(self, input_dict, state, seq_lens):
+        x, edge_index, edge_attr, batch = self.encode_obs(input_dict["obs"])
+        if x is None:
+            self._model_out = torch.zeros((input_dict["obs"].shape[0], 128)).to(device)
+            return torch.zeros((input_dict["obs"].shape[0], self.num_outputs)).to(device), []
+        self._model_out = self.model(x, edge_index, edge_attr, batch)
+        policy_out = self.policy_fn(self._model_out)
+        return policy_out, []
+
 
 class PursuitCNN(TorchModelV2, nn.Module):
     def __init__(self, obs_space, act_space, num_outputs, *args, **kwargs):
         TorchModelV2.__init__(self, obs_space, act_space, num_outputs, *args, **kwargs)
         nn.Module.__init__(self)
+        
         self.model = nn.Sequential(
             nn.Conv2d(3, 32, [2,2], stride=1, padding=1),
             nn.ReLU(),
