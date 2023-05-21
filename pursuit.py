@@ -36,7 +36,7 @@ parser.add_argument("--rollout_fragment_length", type=str, default='auto')
 parser.add_argument("--train_batch_size", type=int, default=512)
 parser.add_argument("--batch_mode", type=str, default="complete_episodes")
 parser.add_argument("--framework", type=str, default="torch")
-parser.add_argument("--use_wandb", type=bool, default=True)
+parser.add_argument("--use_wandb", type=bool, action='store_true')
 
 args = parser.parse_args()
 
