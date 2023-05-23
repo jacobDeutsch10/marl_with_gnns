@@ -4,6 +4,11 @@ from sklearn.feature_extraction.image import grid_to_graph
 from torch_geometric.utils import dense_to_sparse
 import numpy as np
 
+def random_mask_obs(obs, mask_prob=0.5):
+    mask = torch.rand(obs.shape) < mask_prob
+    obs[mask] = 0
+    return obs
+
 def get_adjacent(index, shape, hops=1):
     adjacent = []
     for c in range(shape[2]):

@@ -37,6 +37,11 @@ parser.add_argument("--train_batch_size", type=int, default=512)
 parser.add_argument("--batch_mode", type=str, default="complete_episodes")
 parser.add_argument("--framework", type=str, default="torch")
 parser.add_argument("--use_wandb", action='store_true')
+parser.add_argument('-mp', "--mask_prob", type=float, default=0.0)
+parser.add_argument('--env_size', type=int, default=16, help='size of the environment')
+parser.add_argument('--n_pursuers', type=int, default=8, help='number of agents')
+parser.add_argument('--n_evaders', type=int, default=30, help='number of evaders')
+parser.add_argument('--obs_range', type=int, default=7, help='range for observation')
 
 args = parser.parse_args()
 
@@ -47,7 +52,13 @@ model_map = {
     "cnn": "pursuitcnn",
     "gnn": "pursuitgnn"
 }
-
+env_config = {
+    "n_evaders": args.n_evaders,
+    "n_pursuers": args.n_pursuers,
+    "obs_range": args.obs_range,
+    "x_size": args.env_size,
+    "y_size": args.env_size,
+}
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 ray.init(num_gpus=1, ignore_reinit_error=True)
 register_env("pursuit", lambda _: PettingZooEnv(pursuit_v4.env()))
@@ -59,7 +70,7 @@ ModelCatalog.register_custom_model(
         "pursuitcnn", PursuitCNN
 )
 ModelCatalog.register_custom_model(
-        "pursuitgnn", PursuitConvEncGNN
+        "pursuitgnn", PursuitGNN
 )
 cb = []
 if args.use_wandb:
@@ -67,17 +78,18 @@ if args.use_wandb:
 tune.Tuner(
     "PPO",
     run_config=air.RunConfig(
-        stop={"episodes_total": 600},
+        stop={"episodes_total": 450},
          local_dir="ray_results/pursuit",
         name=f"PPO_{args.model}_pursuit",
         checkpoint_config=air.CheckpointConfig(
-            checkpoint_frequency=50,
+            checkpoint_frequency=300,
         ),
         callbacks=cb,
     ),
     param_space={
         # Enviroment specific.
         "env": "pursuit",
+        "env_config": env_config,
         # General
         "framework": "torch",
         "batch_mode": "complete_episodes",
@@ -87,7 +99,7 @@ tune.Tuner(
         "compress_observations": args.compress_observations,
         "rollout_fragment_length": args.rollout_fragment_length,
         "train_batch_size": args.train_batch_size,
-        "model": { 'custom_model': model_map[args.model]},
+        "model": { 'custom_model': model_map[args.model], "custom_model_config": {"mask_prob": args.mask_prob}},
         "gamma": args.gamma,
         "n_step": args.n_step,
         "lr": args.lr,
@@ -105,7 +117,7 @@ tune.Tuner(
             # Class, obs/act-spaces, and config will be derived
             # automatically.
             "policies": {"shared_policy"},
-            "model": { 'custom_model': model_map[args.model]},
+            "model": { 'custom_model': model_map[args.model], "custom_model_config": {"mask_prob": args.mask_prob}},
             # Always use "shared" policy.
             "policy_mapping_fn": (
                 lambda agent_id, episode, worker, **kwargs: "shared_policy"
