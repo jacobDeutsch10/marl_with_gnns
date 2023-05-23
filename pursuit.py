@@ -7,11 +7,11 @@ import os
 import torch.nn as nn
 from ray.rllib.models import ModelCatalog
 from ray.air.integrations.wandb import WandbLoggerCallback
-from magnn.models import PursuitMLP, PursuitCNN, PursuitGNN
+from magnn.models import PursuitMLP, PursuitCNN, PursuitGNN, PursuitGAT, PursuitSAGE
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-m", '--model', type=str, default="mlp", choices=["mlp", "cnn", "gnn"])
+parser.add_argument("-m", '--model', type=str, default="mlp", choices=["mlp", "cnn", "gnn", "gat", "sage"])
 
 """python pursuit.py -m mlp --train_batch_size 5000 --lr 0.0001 --batch_mode truncate_episodes"""
 
@@ -44,7 +44,9 @@ args = parser.parse_args()
 model_map = {
     "mlp": "pursuitmlp",
     "cnn": "pursuitcnn",
-    "gnn": "pursuitgnn"
+    "gnn": "pursuitgnn",
+    "gat": "pursuitgat",
+    "sage": "pursuitsage"
 }
 
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
@@ -59,6 +61,12 @@ ModelCatalog.register_custom_model(
 )
 ModelCatalog.register_custom_model(
         "pursuitgnn", PursuitGNN
+)
+ModelCatalog.register_custom_model(
+        "pursuitgat", PursuitGAT
+)
+ModelCatalog.register_custom_model(
+        "pursuitsage", PursuitSAGE
 )
 
 tune.Tuner(
