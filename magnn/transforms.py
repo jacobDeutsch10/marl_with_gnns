@@ -31,13 +31,15 @@ def gen_idx(shape):
 def obs_to_graph_batch(obs):
     hops = 1
     datas = []
+    obs_shape = obs.shape[1:]
+    original_shape = (int(np.sqrt(obs_shape[0]//3)), int(np.sqrt(obs_shape[0]//3)), 3) # guess the original shape
     for batch_id, observation in enumerate(obs):
-        adj_matrix = grid_to_graph(*observation.shape, mask=observation.cpu().numpy(), return_as=np.ndarray)
+        adj_matrix = observation
         edge_index = dense_to_sparse(torch.as_tensor(adj_matrix, dtype=torch.long))[0].reshape(2, -1)
         # check dummy input and return valid index:
         if edge_index.shape[0] < 1:
             edge_index = torch.tensor([[0, 0]], dtype=torch.long).t().contiguous()
-        node_features = torch.as_tensor(gen_idx(observation.shape), dtype=torch.float).reshape(-1, 3)
+        node_features = torch.as_tensor(gen_idx(original_shape), dtype=torch.float).reshape(-1, 3)
         data = Data(x=node_features, edge_index=edge_index)
         datas.append(data)
     batch = Batch.from_data_list(datas)

@@ -1,4 +1,5 @@
-from pettingzoo.sisl import pursuit_v4, waterworld_v4
+#from pettingzoo.sisl import pursuit_v4, waterworld_v4
+from magnn.env_pursuit import env
 import ray
 from ray import air, tune
 from ray.rllib.env.wrappers.pettingzoo_env import PettingZooEnv
@@ -7,11 +8,11 @@ import os
 import torch.nn as nn
 from ray.rllib.models import ModelCatalog
 from ray.air.integrations.wandb import WandbLoggerCallback
-from magnn.models import PursuitMLP, PursuitCNN, PursuitGNN, PursuitConvEncGNN
+from magnn.models import PursuitMLP, PursuitCNN, PursuitGNN, PursuitGAT
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-m", '--model', type=str, default="mlp", choices=["mlp", "cnn", "gnn"])
+parser.add_argument("-m", '--model', type=str, default="mlp", choices=["mlp", "cnn", "gnn", "gat"])
 
 """python pursuit.py -m mlp --train_batch_size 5000 --lr 0.0001 --batch_mode truncate_episodes"""
 
@@ -50,7 +51,8 @@ args = parser.parse_args()
 model_map = {
     "mlp": "pursuitmlp",
     "cnn": "pursuitcnn",
-    "gnn": "pursuitgnn"
+    "gnn": "pursuitgnn",
+    "gat": "pursuitgat",
 }
 env_config = {
     "n_evaders": args.n_evaders,
@@ -59,9 +61,10 @@ env_config = {
     "x_size": args.env_size,
     "y_size": args.env_size,
 }
+
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 ray.init(num_gpus=1, ignore_reinit_error=True)
-register_env("pursuit", lambda _: PettingZooEnv(pursuit_v4.env()))
+register_env("pursuit", lambda _: PettingZooEnv(env(as_graph=args.model in ["gnn", "gat"])))
 
 ModelCatalog.register_custom_model(
         "pursuitmlp", PursuitMLP 
@@ -71,6 +74,9 @@ ModelCatalog.register_custom_model(
 )
 ModelCatalog.register_custom_model(
         "pursuitgnn", PursuitGNN
+)
+ModelCatalog.register_custom_model(
+        "pursuitgat", PursuitGAT
 )
 cb = []
 if args.use_wandb:
