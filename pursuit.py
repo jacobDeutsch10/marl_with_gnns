@@ -84,7 +84,7 @@ if args.use_wandb:
 tune.Tuner(
     "PPO",
     run_config=air.RunConfig(
-        stop={"episodes_total": 450},
+        stop={"episodes_total": 600},
          local_dir="ray_results/pursuit",
         name=f"PPO_{args.model}_pursuit",
         checkpoint_config=air.CheckpointConfig(
