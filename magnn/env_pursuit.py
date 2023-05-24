@@ -11,18 +11,35 @@ from pettingzoo.utils import agent_selector, wrappers
 from pettingzoo.utils.conversions import parallel_wrapper_fn
 from sklearn.feature_extraction.image import grid_to_graph
 from collections import OrderedDict
-__all__ = ["ManualPolicy", "env", "parallel_env", "raw_env"]
 
+__all__ = ["ManualPolicy", "env", "parallel_env", "raw_env"]
+def get_adjacent(index, shape, hops=1):
+    adjacent = []
+    for c in range(shape[2]):
+        for dx in range(0, hops+1):
+            for dy in range(0, hops+1):
+                if dx != 0 or dy != 0:  # exclude the cell itself
+                    adjacent.append((index[0] + dx, index[1] + dy, c))
+    valid_adjacent = [i for i in adjacent if 0 <= i[0] < shape[0] and 0 <= i[1] < shape[1]]
+    return valid_adjacent
 
 def env(as_graph, **kwargs):
     env = raw_env(**kwargs)
     env.as_graph = as_graph
     if as_graph:
         obs_size = (env.env.obs_range**2)*3
-        env.observation_spaces = dict(zip(
+        """env.observation_spaces = dict(zip(
             env.agents,
             [Box(low=0, high=1, shape=(obs_size, obs_size), dtype=np.int32) for _ in env.agents]
-        ))
+        ))"""
+        """nodes = []
+        for i in range(env.env.obs_range):
+            for j in range(env.env.obs_range):
+                for k in range(3):
+                    nodes.append((i, j, k))
+        node_dict = {node: idx for idx, node in enumerate(nodes)}
+        env.node_dict = node_dict
+        env.nodes = nodes"""
     print('x_size', env.env.x_size)
     print('y_size', env.env.y_size)
     print('obs_range', env.env.obs_range)
@@ -116,8 +133,15 @@ class raw_env(AECEnv, EzPickle):
     def observe(self, agent):
         o = self.env.safely_observe(self.agent_name_mapping[agent])
         o = np.swapaxes(o, 2, 0)
-        if self.as_graph:
-            o = grid_to_graph(*o.shape, return_as=np.ndarray)  
+        """ if self.as_graph:
+            adj_t = np.zeros((len(self.nodes), len(self.nodes)))
+            for node in self.nodes:
+                adjacents = get_adjacent(node, o.shape )
+                for adj in adjacents:
+                    
+                    adj_t[self.node_dict[node], self.node_dict[adj]] = 1
+                    adj_t[self.node_dict[adj], self.node_dict[node]] = 1
+            o = adj_t"""
         return o
     def observation_space(self, agent: str):
         return self.observation_spaces[agent]
