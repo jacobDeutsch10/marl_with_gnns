@@ -6,7 +6,7 @@ import time
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, Sequential, GENConv, GATConv
+from torch_geometric.nn import GCNConv, Sequential, GENConv, GATConv, SAGEConv
 from torch_geometric.nn import global_mean_pool
 from magnn.transforms import obs_to_graph_batch, random_mask_obs, GraphTransformer
 from torch_geometric.data import Data, Batch
@@ -136,72 +136,21 @@ class SpreadMLP(TorchModelV2, nn.Module):
         policy_out = self.policy_fn(self._model_out)
         return policy_out, []
     
-
-class MultiAgentGraph(nn.Module):
-    def __init__(self, num_landmarks, num_agents):
-        super(MultiAgentGraph, self).__init__()
-        self.num_landmarks = num_landmarks
-        self.num_agents = num_agents
-
-    def forward(self, batch_observations):
-        batch_data = []
-        for obs in batch_observations:
-            agent_vel_pos = obs[:4]  # velocity and position
-            rel_landmarks = obs[4:4+2*self.num_landmarks].reshape(self.num_landmarks, 2)
-            rel_others = obs[4+2*self.num_landmarks:4+2*(self.num_landmarks+self.num_agents-1)].reshape(self.num_agents-1, 2)
-            comm = obs[-self.num_agents+1:].reshape(self.num_agents-1, 1)
-
-            # Absolute positions
-            abs_landmarks = agent_vel_pos[2:4] + rel_landmarks
-            abs_others = agent_vel_pos[2:4] + rel_others
-            landmark_features = torch.concatenate((
-                abs_landmarks, 
-                rel_landmarks, 
-                rel_landmarks/(1e-3+agent_vel_pos[:2])
-                , torch.zeros(abs_landmarks.shape[0], 2)), dim=1)
-            other_features = torch.concatenate((
-                abs_others,
-                rel_others,
-                rel_others/(1e-3+agent_vel_pos[:2]),
-                torch.ones(abs_others.shape[0], 1),
-                comm), dim=1)
-            agent_features = torch.concatenate((
-                agent_vel_pos[2:4].reshape(1, 2),
-                agent_vel_pos[:2].reshape(1, 2),
-                torch.zeros(1, 2),
-                torch.ones(1, 1)*2,
-                torch.zeros(1, 1)), dim=1)
-            # Concatenate all node features
-            x = torch.cat((agent_features, landmark_features, other_features), dim=0)
-
-            # Each node is connected with every other node
-            edge_index = torch.combinations(torch.arange(self.num_agents + self.num_landmarks), r=2).t()
-
-            # Create edge attributes: Euclidean distance between nodes
-            node_features = x.reshape(self.num_agents + self.num_landmarks, -1)
-            edge_attr = (node_features[edge_index[0]][:2] - node_features[edge_index[1]][:2]).pow(2).sum(-1).sqrt()
-
-            data = Data(x=torch.tensor(x, dtype=torch.float), edge_index=edge_index, edge_attr=edge_attr)
-            batch_data.append(data)
-
-        batch = Batch.from_data_list(batch_data).to(device)
-        return batch
-    
 class SpreadGNN(TorchModelV2, nn.Module):
     def __init__(self, obs_space, act_space, num_outputs, *args, **kwargs):
         TorchModelV2.__init__(self, obs_space, act_space, num_outputs, *args, **kwargs)
+        self.num_units = obs_space.shape[0]//5
         nn.Module.__init__(self)
-        self.to_graph = MultiAgentGraph(3, 3)
         self.model = Sequential('x, edge_index, batch', [
-            (GENConv(3, 64), 'x, edge_index -> x'),
+            (SAGEConv(5, 64), 'x, edge_index -> x'),
             nn.ReLU(inplace=True),
-            (GENConv(64, 128), 'x, edge_index -> x'),
+            (SAGEConv(64, 128), 'x, edge_index -> x'),
             nn.ReLU(inplace=True),
-            (GENConv(128, 128), 'x, edge_index -> x'),
+            (SAGEConv(128, 128), 'x, edge_index -> x'),
             nn.ReLU(inplace=True),
             (global_mean_pool, ('x, batch -> x'))
         ])
-
+        self.edge_index = torch.zeros((self.num_units, self.num_units)).nonzero().t()
         self.value_fn = nn.Linear(128, 1) 
         self.policy_fn = nn.Linear(128, num_outputs)
     def value_function(self):
@@ -210,8 +159,18 @@ class SpreadGNN(TorchModelV2, nn.Module):
 
     @override(ModelV2)
     def forward(self, input_dict, state, seq_lens):
-        with torch.no_grad():
-            model_in = self.to_graph(input_dict["obs"].float()).to(device) 
+        model_in = input_dict["obs"].float().reshape(-1, self.num_units, 5)
+        
+        
+        datas = []
+        for i in range(model_in.shape[0]):
+            datas.append(
+                Data(
+                    x=model_in[i],
+                    edge_index=self.edge_index,
+                )
+            )
+        model_in = Batch.from_data_list(datas).to(device)
         self._model_out = self.model(model_in.x, model_in.edge_index, model_in.batch)
         policy_out = self.policy_fn(self._model_out)
         return policy_out, []
