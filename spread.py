@@ -67,7 +67,7 @@ if args.use_wandb:
 tune.Tuner(
     "PPO",
     run_config=air.RunConfig(
-        stop={"episodes_total": 4000},
+        stop={"episodes_total": 2500},
          local_dir="ray_results/spread",
         name=f"PPO_{args.model}_spread",
         checkpoint_config=air.CheckpointConfig(
